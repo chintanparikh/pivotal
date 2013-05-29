@@ -22,7 +22,7 @@ end
 PivotalTracker::Client.token('chintan@myaidin.com', 'gp317a45')
 
 aidin = PivotalTracker::Project.all.first
-current_id = nil
+@current_id = nil
 
 def story_info story
   puts story.name
@@ -46,14 +46,14 @@ end
 
 def story_has_been_started
   f = YAML.load_file(TEMP_FILE)
-  current_id = f['id']
+  @current_id = f['id']
   f['id'] != -1
 end
 
 def update_id id
   f = File.open(TEMP_FILE, 'w')
   f.write("id: #{id}")
-  current_id = id
+  @current_id = id
 end
 
 
@@ -78,7 +78,7 @@ when "info"
     
   elsif current(ARGV[1])
     if story_has_been_started
-      story = aidin.stories.find(current_id)
+      story = aidin.stories.find(@current_id)
       puts "\033[32mDisplaying information for current story\033[0m\n"
       story_info(story)
     else    
@@ -98,7 +98,7 @@ when "start"
     current_branch = `git branch | grep "*" | sed "s/* //"`.chomp
     status = `git status -s`
     if !status.empty?
-      puts "\033[33mYou are currently working on story #{current_id} and have uncommitted changes on #{current_branch}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)\033[0m\n"
+      puts "\033[33mYou are currently working on story #{@current_id} and have uncommitted changes on #{current_branch}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)\033[0m\n"
       continue = false
       while (!continue)
         option = $stdin.gets.chomp
@@ -140,7 +140,7 @@ when "start"
 
 when "complete"
   if story_has_been_started
-    story = aidin.stories.find(current_id)
+    story = aidin.stories.find(@current_id)
     branch = "feature/#{story.id}_#{story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
     `git push origin #{branch}`
     story.update(current_state: 'finished')
@@ -154,7 +154,7 @@ when "complete"
   
 when 'abandon'
   if story_has_been_started
-    story = aidin.stories.find(current_id)
+    story = aidin.stories.find(@current_id)
     story.update(current_state: 'unstarted')
     
     puts "\033[32mStory #{story.id} has been abandoned\033[0m\n"
