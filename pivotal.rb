@@ -28,6 +28,7 @@ end
 PivotalTracker::Client.token('chintan@myaidin.com', 'gp317a45')
 
 aidin = PivotalTracker::Project.all.first
+current_id = nil
 # next_story = aidin.stories.all(owner: 'Chintan Parikh', state: 'unstarted').first
 
 # puts "id: #{next_story.id}"
@@ -57,7 +58,8 @@ end
 
 def story_has_been_started
   f = YAML.load_file(TEMP_FILE)
-  f['id'] != -1
+  current_id = f['id']
+  f['id'] == -1
 end
 
 
@@ -97,10 +99,22 @@ when "estimate"
 when "start"
   # pivotal start next
   # pivotal start id
-  f = YAML.load_file(TEMP_FILE)
-  id = f['id']
+  if story_has_been_started
+    puts "\033[33mYou are currently working on story #{current_id}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)\033[0m\n"
+    continue = false
+    while (!continue)
+      option = $stdin.gets.chomp
+      if option == 'N'
+        exit 1
+      elsif option != 'Y'
+        puts "Please enter either Y or N"
+      else
+        continue = true;
+      end
+    end
+  end
 
-  # Error if currently on a story
+
   # Ensure next story has estimate
   # git checkout develop
   # git pull
