@@ -16,13 +16,13 @@ unless File.file? TEMP_FILE
   f = File.open(TEMP_FILE, 'w')
   f.write("id: -1")
 end
+
+unless File.file? CONFIG_FILE
+  f = File.open(CONFIG_FILE, 'w')
+  f.write("")
+end
 # TEMP FILE format:
   # current_story_id: 123 OR -1
-
-PivotalTracker::Client.token('chintan@myaidin.com', 'gp317a45')
-
-aidin = PivotalTracker::Project.all.first
-@current_id = nil
 
 def story_info story
   puts story.name
@@ -56,6 +56,43 @@ def update_id id
   @current_id = id
 end
 
+def set_config key, value
+  config = YAML::load(File.read(CONFIG_FILE)) || {}
+  config[key.to_sym] = value
+  open(CONFIG_FILE, 'w') { |f| YAML::dump(config, f) }
+end
+
+def authenticate
+  config = YAML::load(File.read(CONFIG_FILE)) || {}
+  has_email = true, has_password = true
+
+  unless config.has_key? :email
+    puts "\033[33mUse pivotal set email EMAIL to set your pivotal tracker email\033[0m\n"
+    has_email = false
+  end
+
+  unless config.has_key? :password
+    puts "\033[33mUse pivotal set password PASSWORD to set your pivotal tracker email\033[0m\n"
+    has_password = false
+  end
+
+  unless has_email and has_password
+    exit 0
+  end
+  PivotalTracker::Client.token(config[:email], config[:password])
+end
+
+@current_id = nil
+
+begin
+  unless ARGV[0] == 'set'
+    authenticate
+    aidin = PivotalTracker::Project.all.first
+  end
+rescue
+  puts "\033[33mInvalid Credentials\033[0m\n"
+  exit 0
+end
 
 case ARGV[0]
 when "info"
@@ -169,5 +206,8 @@ when 'list'
     story_info(story)
   end
 when 'set'
-  # set username, password
+  # set email
+  # set password
+  set_config(ARGV[1], ARGV[2])
+  puts "\033[32m#{ARGV[1]} has been set to #{ARGV[2]}\033[0m\n"
 end
