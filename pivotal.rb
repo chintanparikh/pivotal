@@ -2,12 +2,7 @@
 
 require 'pivotal-tracker'
 require 'yaml'
-
-# pivotal next - Display information about your next project
-# pivotal estimate (1-8)
-# pivotal start (next|ID) - marks story as started, creates new git branch
-# git commit, push, etc, etc
-# pivotal complete
+require 'debugger'
 
 TEMP_DIR = "#{ENV['HOME']}/.pivotal/" 
 TEMP_FILE = TEMP_DIR + "temp.yml"
@@ -28,18 +23,12 @@ PivotalTracker::Client.token('chintan@myaidin.com', 'gp317a45')
 
 aidin = PivotalTracker::Project.all.first
 current_id = nil
-# next_story = aidin.stories.all(owner: 'Chintan Parikh', state: 'unstarted').first
-
-# puts "id: #{next_story.id}"
-# puts next_story.name
-# puts next_story.description
-# puts "estimate: #{(next_story.estimate == -1) ? 'unestimated' : next_story.estimate}"
-# puts "branch_name: feature/#{next_story.id}_#{next_story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
 
 def story_info story
   puts story.name
   puts "id:\t\t#{story.id}"
   puts "notes:\t\t#{story.description}"
+  puts "status:\t\t#{story.current_state}"
   puts "estimate:\t#{(story.estimate == -1) ? 'unestimated' : story.estimate}"
 end
 
@@ -148,6 +137,7 @@ when "start"
 
   puts "\033[32mStory #{story.id} has been started\033[0m\n"
   story_info(story)
+
 when "complete"
   if story_has_been_started
     story = aidin.stories.find(current_id)
@@ -155,15 +145,29 @@ when "complete"
     `git push origin #{branch}`
     story.update(current_state: 'finished')
     story.update(current_state: 'delivered')
+    
+    puts "\033[32mStory #{story.id} has been completed\033[0m\n"
     update_id(-1)
   else
     puts "\033[33mNo story has been started. Use pivotal start to start a story first\033[0m\n"
   end
   
 when 'abandon'
-  # mark story as unstarted
+  if story_has_been_started
+    story = aidin.stories.find(current_id)
+    story.update(current_state: 'unstarted')
+    
+    puts "\033[32mStory #{story.id} has been abandoned\033[0m\n"
+    update_id(-1)
+  else
+    puts "\033[33mNo story has been started. Use pivotal start to start a story first\033[0m\n"
+  end
+
 when 'list'
-  # list all unstarted + inprogress stories belonging to you
+  stories = aidin.stories.all(owner: 'Chintan Parikh', current_state: ['unstarted', 'started', 'finished', 'delivered'])
+  stories.each do |story|
+    story_info(story)
+  end
 when 'set'
   # set username, password
 end
