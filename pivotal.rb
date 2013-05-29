@@ -100,19 +100,21 @@ when "start"
   # pivotal start next
   # pivotal start id
   if story_has_been_started
-    current_branch = `git branch | grep "*" | sed "s/* //"`
+    current_branch = `git branch | grep "*" | sed "s/* //"`.chomp
     status = `git status -s`
     debugger
-    puts "\033[33mYou are currently working on story #{current_id}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)\033[0m\n"
-    continue = false
-    while (!continue)
-      option = $stdin.gets.chomp
-      if option == 'N'
-        exit 1
-      elsif option != 'Y'
-        puts "Please enter either Y or N"
-      else
-        continue = true;
+    if !status.empty?
+      puts "\033[33mYou are currently working on story #{current_id} and have uncommitted changes on #{current_branch}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)\033[0m\n"
+      continue = false
+      while (!continue)
+        option = $stdin.gets.chomp
+        if option == 'N'
+          exit 1
+        elsif option != 'Y'
+          puts "Please enter either Y or N"
+        else
+          continue = true;
+        end
       end
     end
   end
