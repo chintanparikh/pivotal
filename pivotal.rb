@@ -59,12 +59,14 @@ end
 def story_has_been_started
   f = YAML.load_file(TEMP_FILE)
   current_id = f['id']
-  f['id'] == -1
+  debugger
+  f['id'] != -1
 end
 
 def update_id id
   f = File.open(TEMP_FILE, 'w')
   f.write("id: #{id}")
+  current_id = id
 end
 
 
@@ -89,8 +91,9 @@ when "info"
     
   elsif current(ARGV[1])
     if story_has_been_started
+      story = aidin.stories.find(current_id)
       puts "\033[32mDisplaying information for current story\033[0m\n"
-      story_info(aidin.stories.find(current_id))
+      story_info(story)
     else    
       puts "\033[33mNo story has been started. Use pivotal start to start a story first\033[0m\n"
     end
@@ -142,20 +145,27 @@ when "start"
     end
   end
 
-  update_id(story.id)
+  update_id(story.id) unless story.nil?
   story.update(current_state: 'started')
 
-  puts "\033[32mDStory #{story.id} has been started\033[0m\n"
+  puts "\033[32mStory #{story.id} has been started\033[0m\n"
   story_info(story)
-  
-  # Ensure next story has estimate
-  # git checkout develop
-  # git pull
-  # git checkout -b feature/blahblahblah
-  # mark story as started
-  # puts some kind of message to start working
 when "complete"
-  # mark story as finished and delivered
+  if story_has_been_started
+    story = aidin.stories.find(current_id)
+    branch = "feature/#{story.id}_#{story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
+    `git push origin #{branch}`
+    story.update(current_state: 'finished')
+    story.update(current_state: 'delivered')
+    update_id(-1)
+  else
+    puts "\033[33mNo story has been started. Use pivotal start to start a story first\033[0m\n"
+  end
+  
+when 'abandon'
+  # mark story as unstarted
+when 'list'
+  # list all unstarted + inprogress stories belonging to you
 when 'set'
   # set username, password
 end
