@@ -2,7 +2,6 @@
 
 require 'pivotal-tracker'
 require 'yaml'
-require 'debugger'
 
 # pivotal next - Display information about your next project
 # pivotal estimate (1-8)
@@ -59,7 +58,6 @@ end
 def story_has_been_started
   f = YAML.load_file(TEMP_FILE)
   current_id = f['id']
-  debugger
   f['id'] != -1
 end
 
