@@ -100,6 +100,9 @@ when "start"
   # pivotal start next
   # pivotal start id
   if story_has_been_started
+    current_branch = `git branch | grep "*" | sed "s/* //"`
+    status = `git status -s`
+    debugger
     puts "\033[33mYou are currently working on story #{current_id}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)\033[0m\n"
     continue = false
     while (!continue)
