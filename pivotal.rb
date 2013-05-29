@@ -102,7 +102,6 @@ when "start"
   if story_has_been_started
     current_branch = `git branch | grep "*" | sed "s/* //"`.chomp
     status = `git status -s`
-    debugger
     if !status.empty?
       puts "\033[33mYou are currently working on story #{current_id} and have uncommitted changes on #{current_branch}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)\033[0m\n"
       continue = false
@@ -117,6 +116,17 @@ when "start"
         end
       end
     end
+  end
+
+  `git stash`
+  `git stash drop`
+  `git checkout develop`
+  `git pull`
+
+  if is_next(ARGV[1])
+    story = aidin.stories.all(owner: 'Chintan Parikh', state: 'unstarted').first
+    new_branch = "feature/#{next_story.id}_#{next_story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
+    `git checkout -b #{new_branch}`
   end
 
 
