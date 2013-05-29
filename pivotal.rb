@@ -12,7 +12,7 @@ require 'debugger'
 
 TEMP_DIR = "#{ENV['HOME']}/.pivotal/" 
 TEMP_FILE = TEMP_DIR + "temp.yml"
-CONFIG_FILE = TEMP_DIR +"config.yml"
+CONFIG_FILE = TEMP_DIR + "config.yml"
 
 unless File.directory? TEMP_DIR
   Dir::mkdir TEMP_DIR
@@ -66,8 +66,6 @@ when "info"
   # pivotal info next
   # pivotal info id
   # pivotal info current
-  f = YAML.load_file(TEMP_FILE)
-  id = f['id']
 
   if is_next(ARGV[1])
     puts "\033[32mDisplaying information for next story\033[0m\n"
