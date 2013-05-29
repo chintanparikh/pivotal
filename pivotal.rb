@@ -62,6 +62,11 @@ def story_has_been_started
   f['id'] == -1
 end
 
+def update_id id
+  f = File.open(TEMP_FILE, 'w')
+  f.write("id: #{id}")
+end
+
 
 case ARGV[0]
 when "info"
@@ -85,7 +90,7 @@ when "info"
   elsif current(ARGV[1])
     if story_has_been_started
       puts "\033[32mDisplaying information for current story\033[0m\n"
-      story_info()
+      story_info(aidin.stories.find(current_id))
     else    
       puts "\033[33mNo story has been started. Use pivotal start to start a story first\033[0m\n"
     end
@@ -125,11 +130,24 @@ when "start"
 
   if is_next(ARGV[1])
     story = aidin.stories.all(owner: 'Chintan Parikh', state: 'unstarted').first
-    new_branch = "feature/#{next_story.id}_#{next_story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
+    new_branch = "feature/#{story.id}_#{story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
     `git checkout -b #{new_branch}`
+  elsif id(ARGV[1])
+    story = aidin.stories.find(Integer(ARGV[1]))
+    unless story.nil?
+      new_branch = "feature/#{story.id}_#{story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
+      `git checkout -b #{new_branch}`
+    else
+      puts "\033[33mNo story with id #{ARGV[1]} exists\033[0m\n"
+    end
   end
 
+  update_id(story.id)
+  story.update(current_state: 'started')
 
+  puts "\033[32mDStory #{story.id} has been started\033[0m\n"
+  story_info(story)
+  
   # Ensure next story has estimate
   # git checkout develop
   # git pull
