@@ -17,6 +17,7 @@ sudo cp pivotal /usr/bin/
 and chmod it to make it executable
 ```bash
 sudo chmod u+x /usr/bin/pivotal
+```
 
 ##Usage
 Look at the code, I'll type up some documentation when the code isn't fugly and in desperate need of a refactor
