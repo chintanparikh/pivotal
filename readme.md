@@ -4,7 +4,10 @@
 Pivotal is a simple command line application that lets me automate a bunch of tasks I need to do when starting a new story. It's really, really not flexible at all right now, so it probably won't work well for you. I'll probably change that, and add more config options in the future.
 
 ## Requirements
-The [pivotal tracker gem](https://github.com/jsmestad/pivotal-tracker)
+The [pivotal-tracker](https://github.com/jsmestad/pivotal-tracker) gem
+```bash
+gem install pivotal-tracker
+```
 
 ##Installation
 Installation isn't the easiest at the moment, but I'm working to fix that.
