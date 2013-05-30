@@ -2,7 +2,6 @@
 
 require 'pivotal-tracker'
 require 'yaml'
-require 'debugger'
 
 TEMP_DIR = "#{ENV['HOME']}/.pivotal/" 
 TEMP_FILE = TEMP_DIR + "temp.yml"
