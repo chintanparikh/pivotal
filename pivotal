@@ -2,11 +2,12 @@
 
 # TODO
 # * Add checking to the git methods
-# * Use opt-parse
+# * Use escort
 # * Write documentation
 # * Get settings from Pivotal API instead of hard coding
 # * Allow many more config options to make this more flexible
 # * Refactor the shit outta the code
+# * Turn it into a gem
 
 # BUGS
 # * pivotal info next will get the next ESTIMATED story
