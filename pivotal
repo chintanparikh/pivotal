@@ -84,6 +84,14 @@ class YAMLFile
     YAML::load(File.read(@file)) || {}
   end
 
+  def [] key
+    get key
+  end
+
+  def []= key, value
+    set key, value
+  end
+
   def get key
     contents = load @file
     contents[key.to_sym]
@@ -158,15 +166,15 @@ def set_up_environment temp_dir, temp_file, config_file
 end
 
 def init
-  set_up_environment TEMP_DIR, TEMP_DIR, CONFIG_FILE
+  set_up_environment TEMP_DIR, TEMP_FILE, CONFIG_FILE
 
   @config = YAMLFile.new(CONFIG_FILE)
   @info = YAMLFile.new(TEMP_FILE)
 
-  unless ARGV[0] == set
-    @user = User.new config
+  unless ARGV[0] == "set"
+    @user = User.new @config
 
-    unless user.valid?
+    unless @user.valid?
       @user.errors.each do |error|
         Output.error(error)
       end
@@ -274,9 +282,9 @@ when 'abandon'
   end
 
 when "list"
-  stories = @project.stories.all(owner: 'Chintan Parikh', current_state['unstarted', 'started', 'finished', 'delivered'])
+  stories = @project.stories.all(owner: 'Chintan Parikh', current_state: ['unstarted', 'started', 'finished', 'delivered'])
   stories.each do |story|
-    Output.story(story)
+    Output.story_info(story)
   end
 
 when "set"
