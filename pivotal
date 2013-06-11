@@ -1,5 +1,16 @@
 #!/usr/bin/env ruby
 
+# TODO
+# * Add checking to the git methods
+# * Use opt-parse
+# * Write documentation
+# * Get settings from Pivotal API instead of hard coding
+# * Allow many more config options to make this more flexible
+# * Refactor the shit outta the code
+
+# BUGS
+# * pivotal info next will get the next ESTIMATED story
+
 require 'pivotal-tracker'
 require 'yaml'
 
@@ -7,134 +18,199 @@ TEMP_DIR = "#{ENV['HOME']}/.pivotal/"
 TEMP_FILE = TEMP_DIR + "temp.yml"
 CONFIG_FILE = TEMP_DIR + "config.yml"
 
-unless File.directory? TEMP_DIR
-  Dir::mkdir TEMP_DIR
-end
-
-unless File.file? TEMP_FILE
-  f = File.open(TEMP_FILE, 'w')
-  f.write("id: -1")
-end
-
-unless File.file? CONFIG_FILE
-  f = File.open(CONFIG_FILE, 'w')
-  f.write("")
-end
-# TEMP FILE format:
-  # current_story_id: 123 OR -1
-
-def story_info story
-  puts story.name
-  puts "id:\t\t#{story.id}"
-  puts "notes:\t\t#{story.description}"
-  puts "status:\t\t#{story.current_state}"
-  puts "estimate:\t#{(story.estimate == -1) ? 'unestimated' : story.estimate}"
-end
-
-def is_next string
-  string == 'next'
-end
-
-def id string
-  !string.match(/^[\d]+(\.[\d]+){0,1}$/).nil?
-end
-
-def current string
-  string == 'current'
-end
-
-def story_has_been_started
-  f = YAML.load_file(TEMP_FILE)
-  @current_id = f['id']
-  f['id'] != -1
-end
-
-def update_id id
-  f = File.open(TEMP_FILE, 'w')
-  f.write("id: #{id}")
-  @current_id = id
-end
-
-def set_config key, value
-  config = YAML::load(File.read(CONFIG_FILE)) || {}
-  config[key.to_sym] = value
-  open(CONFIG_FILE, 'w') { |f| YAML::dump(config, f) }
-end
-
-def authenticate
-  config = YAML::load(File.read(CONFIG_FILE)) || {}
-  has_email = true, has_password = true
-
-  unless config.has_key? :email
-    puts "\033[33mUse pivotal set email EMAIL to set your pivotal tracker email\033[0m\n"
-    has_email = false
+class Git
+  def self.current_branch
+    `git branch | grep "*" | sed "s/* //"`.chomp
   end
 
-  unless config.has_key? :password
-    puts "\033[33mUse pivotal set password PASSWORD to set your pivotal tracker email\033[0m\n"
-    has_password = false
+  def self.status
+    `git status -s`
   end
 
-  unless has_email and has_password
-    exit 0
+  def self.stash
+    `git stash`
   end
-  PivotalTracker::Client.token(config[:email], config[:password])
+
+  def self.drop_stash
+    `git stash drop`
+  end
+
+  def self.discard_current_changes
+    self.stash
+    self.drop_stash
+  end
+
+  def self.checkout branch
+    `git checkout #{branch}`
+  end
+
+  def self.pull
+    `git pull`
+  end
+
+  def self.branch_name story
+    "feature/#{story.id}_#{story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
+  end
+
+  def self.push branch
+    `git push origin #{branch}`
+  end
 end
 
-@current_id = nil
-
-begin
-  unless ARGV[0] == 'set'
-    authenticate
-    aidin = PivotalTracker::Project.all.first
+class Output
+  def self.error string
+    puts "\033[33m" + string + "\033[0m\n"
   end
-rescue
-  puts "\033[33mInvalid Credentials\033[0m\n"
-  exit 0
+
+  def self.message string
+    puts "\033[32m" + string + "\033[0m\n"
+  end
+
+  def self.story_info story
+    puts story.name
+    puts "id:\t\t#{story.id}"
+    puts "notes:\t\t#{story.description}"
+    puts "status:\t\t#{story.current_state}"
+    puts "estimate:\t#{(story.estimate == -1) ? 'unestimated' : story.estimate}"
+  end
 end
+
+class YAMLFile
+  def initialize file
+    @file = file
+  end
+
+  def load file
+    YAML::load(File.read(@file)) || {}
+  end
+
+  def get key
+    contents = load @file
+    contents[key.to_sym]
+  end
+
+  def has_key? key
+    contents = load @file
+    contents.has_key? key.to_sym
+  end
+
+  def put key, value
+    contents = load @file
+    config[key.to_sym] = value
+    open(@file, 'w') { |f| YAML::dump(contents, f)}
+  end
+end
+
+class User
+  def initialize config
+    @email = nil
+    @password = nil
+    @token = nil
+    @errors = []
+    if config.has_key? :email
+      @email = config.get(:email)
+    else
+      @errors.add("Email is not set! Use pivotal set to set the email")
+    end
+    if config.has_key? :password
+      @password = config.get(:password)
+    else
+      @errors.add("Password is not set! Use pivotal set to set the password")
+    end
+    
+    if @errors.empty?
+      @token = PivotalTracker::Client.token(config[:email], config[:password])
+    end
+  end
+
+  def errors
+    @errors
+  end
+
+  def valid?
+    !@token.nil?
+  end
+
+  def started_story?
+    info = new YAMLFile(TEMP_FILE)
+    info.get(id) != -1
+  end
+
+  def get_projects
+    PivotalTracker::Project.all
+  end
+end
+
+def set_up_environment temp_dir, temp_file, config_file
+  unless File.directory? temp_dir
+    Dir::mkdir temp_dir
+  end
+
+  unless File.file? temp_file
+    f = File.open(temp_file, 'w')
+    f.write("id: -1")
+  end
+
+  unless File.file? config_file
+    f = File.open(config_file, 'w')
+    f.write("")
+  end 
+end
+
+def init
+  set_up_environment TEMP_DIR, TEMP_DIR, CONFIG_FILE
+
+  @config = YAMLFile.new(CONFIG_FILE)
+  @info = YAMLFile.new(TEMP_FILE)
+
+  unless ARGV[0] == set
+    @user = User.new config
+
+    unless user.valid?
+      @user.errors.each do |error|
+        Output.error(error)
+      end
+      exit 0
+    end
+  end
+
+  @project = @user.get_projects.first
+end
+
+init
 
 case ARGV[0]
 when "info"
   # pivotal info next
   # pivotal info id
   # pivotal info current
-
-  if is_next(ARGV[1])
-    puts "\033[32mDisplaying information for next story\033[0m\n"
-    story_info(aidin.stories.all(owner: 'Chintan Parikh', state: 'unstarted').first)
-
-  elsif id(ARGV[1])
-    story = aidin.stories.find(Integer(ARGV[1]))
+  if ARGV[1] == 'next'
+    Output.message("Displaying information for next story")
+    Output.story_info(@project.stories.all(owner: "Chintan Parikh", state: "unstarted").first)
+  elsif !ARGV[1].match(/^[\d]+(\.[\d]+){0,1}$/).nil?
+    story = @project.stories.find(Integer[ARGV[1]])
     unless story.nil?
-      puts "\033[32mDisplaying information for story #{ARGV[1]}\033[0m\n"
-      story_info(story)
+      Output.message("Displaying information for story #{ARGV[1]}")
+      Output.story_info(story)
     else
-      puts "\033[33mNo story with id #{ARGV[1]} exists\033[0m\n"
+      Output.error("No story with id #{ARGV[1]} exists")
     end
-    
-  elsif current(ARGV[1])
-    if story_has_been_started
-      story = aidin.stories.find(@current_id)
-      puts "\033[32mDisplaying information for current story\033[0m\n"
-      story_info(story)
-    else    
-      puts "\033[33mNo story has been started. Use pivotal start to start a story first\033[0m\n"
+  elsif ARGV[1] == "current"
+    if @user.started_story?
+      story = @project.stories.find(@info.get('id'))
+      Output.message("Displaying information for story #{story.id}")
+      Output.story_info story
+    else
+      Output.error("No story has been started. Use pivotal start to start a story first")
     end
   end
-
-when "estimate"
-  # pivotal estimate next 1-8
-  # pivotal estimate id 1-8
-  # pivotal estimate current 1-8
 
 when "start"
   # pivotal start next
   # pivotal start id
-  if story_has_been_started
-    current_branch = `git branch | grep "*" | sed "s/* //"`.chomp
-    status = `git status -s`
-    if !status.empty?
-      puts "\033[33mYou are currently working on story #{@current_id} and have uncommitted changes on #{current_branch}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)\033[0m\n"
+  if @user.started_story?
+    unless Git.status.empty?
+      Output.error("You are currently working on story #{@current_id} and have uncommitted changes on #{current_branch}. If you continue, your uncommitted changes will be lost. Continue? (Y/N)")
       continue = false
       while (!continue)
         option = $stdin.gets.chomp
@@ -149,64 +225,67 @@ when "start"
     end
   end
 
-  `git stash`
-  `git stash drop`
-  `git checkout develop`
-  `git pull`
+  Git.discard_current_changes
+  Git.checkout "develop"
+  Git.pull
 
-  if is_next(ARGV[1])
-    story = aidin.stories.all(owner: 'Chintan Parikh', state: 'unstarted').first
-    new_branch = "feature/#{story.id}_#{story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
-    `git checkout -b #{new_branch}`
-  elsif id(ARGV[1])
-    story = aidin.stories.find(Integer(ARGV[1]))
+  story = nil
+  if ARGV[1] == "next"
+    story = @project.stories.all(owner: 'Chintan Parikh', state: 'unstarted').first
+    Git.checkout Git.branch_name(story)
+  elsif !ARGV[1].match(/^[\d]+(\.[\d]+){0,1}$/).nil?
+    story = @project.stories.find(Integer(ARGV[1]))
     unless story.nil?
-      new_branch = "feature/#{story.id}_#{story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
-      `git checkout -b #{new_branch}`
+      Git.checkout Git.branch_name(story)
     else
-      puts "\033[33mNo story with id #{ARGV[1]} exists\033[0m\n"
+      Output.error("No story with id #{ARGV[1]} exists")
     end
   end
 
-  update_id(story.id) unless story.nil?
-  story.update(current_state: 'started')
-
-  puts "\033[32mStory #{story.id} has been started\033[0m\n"
-  story_info(story)
+  unless story.nil?
+    @info.put 'id', story.id
+    story.update(current_state: 'started')
+    Output.message("Story #{story.id} has been started")
+    Output.story_info story
+  end
 
 when "complete"
-  if story_has_been_started
-    story = aidin.stories.find(@current_id)
-    branch = "feature/#{story.id}_#{story.name.downcase.gsub(' ', '_').gsub(/[^0-9A-Za-z_]/, '')}"
-    `git push origin #{branch}`
+  if @user.started_story?
+    story = @project.stories.find(@info.get('id'))
+    Git.push Git.branch_name(story)
     story.update(current_state: 'finished')
     story.update(current_state: 'delivered')
-    
-    puts "\033[32mStory #{story.id} has been completed\033[0m\n"
-    update_id(-1)
+    @info.put('id', -1)
+    Output.message("Story #{story.id} has been completed")
   else
-    puts "\033[33mNo story has been started. Use pivotal start to start a story first\033[0m\n"
-  end
-  
-when 'abandon'
-  if story_has_been_started
-    story = aidin.stories.find(@current_id)
-    story.update(current_state: 'unstarted')
-    
-    puts "\033[32mStory #{story.id} has been abandoned\033[0m\n"
-    update_id(-1)
-  else
-    puts "\033[33mNo story has been started. Use pivotal start to start a story first\033[0m\n"
+    Output.error("No story has been started. Use pivotal start to start a story first")
   end
 
-when 'list'
-  stories = aidin.stories.all(owner: 'Chintan Parikh', current_state: ['unstarted', 'started', 'finished', 'delivered'])
-  stories.each do |story|
-    story_info(story)
+when 'abandon'
+  if @user.started_story?
+    story = @project.stories.find(@info.get('id'))
+    story.update(current_state: 'unstarted')
+    Output.message("Story #{story.id} has been abandoned")
+    @info.put("id", -1)
+    Git.checkout "develop"
+    Git.pull
+  else
+    Output.error("No story has been started. Use pivotal start to start a story first")
   end
-when 'set'
-  # set email
-  # set password
-  set_config(ARGV[1], ARGV[2])
-  puts "\033[32m#{ARGV[1]} has been set to #{ARGV[2]}\033[0m\n"
+
+when "list"
+  stories = @project.stories.all(owner: 'Chintan Parikh', current_state['unstarted', 'started', 'finished', 'delivered'])
+  stories.each do |story|
+    Output.story(story)
+  end
+
+when "set"
+  @config.set(ARGV[1], ARGV[2])
+  Output.message("#{ARGV[1]} has been set to #{ARGV[2]}")
 end
+
+
+
+
+
+
